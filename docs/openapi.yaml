@@ -1,0 +1,42 @@
+openapi: 3.0.0
+info:
+  title: API Surveillance Trafic
+  version: 1.0.0
+  description: Documentation de l’API pour la détection et l’analyse du trafic routier.
+servers:
+  - url: http://localhost:5000
+paths:
+  /detect:
+    post:
+      summary: Détecter les véhicules sur une image ou une vidéo
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Résultat de la détection
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vehicles:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                        confidence:
+                          type: number
+                        bbox:
+                          type: array
+                          items:
+                            type: number

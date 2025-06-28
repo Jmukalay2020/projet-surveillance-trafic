@@ -1,13 +1,14 @@
-import streamlit as st
-import requests
-import pandas as pd
-import matplotlib.pyplot as plt
-import os
-import folium
-from streamlit_folium import st_folium
+import streamlit as st  # Pour l'interface web
+import requests  # Pour les requêtes HTTP vers l'API
+import pandas as pd  # Pour la manipulation de données
+import matplotlib.pyplot as plt  # Pour les graphiques
+import os  # Pour la gestion des fichiers
+import folium  # Pour la cartographie interactive
+from streamlit_folium import st_folium  # Pour intégrer Folium dans Streamlit
 
 # --- En-tête stylisé et animation ---
 st.set_page_config(page_title="ISICOM TRAFFIC CONTROL", page_icon="🚦", layout="centered")
+# Bloc HTML/CSS pour le style du titre et des boutons
 st.markdown("""
     <style>
     .main {background-color: #f5f7fa;}
