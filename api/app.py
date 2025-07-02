@@ -22,9 +22,12 @@ async def analyze_video(file: UploadFile = File(...)):
         with open(temp_video_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         # Création du détecteur et analyse de la vidéo avec sauvegarde vidéo annotée
-        detector = VehicleDetector(model_path='yolov5s.pt', conf=0.3)
+        detector = VehicleDetector(model_path='yolov5su.pt', conf=0.3)
         # On force show=False pour éviter l'affichage serveur
-        results = detector.detect_vehicles(temp_video_path, save_csv=True, output_csv='resultats_api.csv', show=False, save_video=True, output_video=temp_annotated_path)
+        # Force la sauvegarde du CSV à la racine du projet (où Streamlit le lit)
+        output_csv_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), 'resultats_api.csv'))
+        # Accélère l'analyse en traitant une frame sur deux
+        results = detector.detect_vehicles(temp_video_path, save_csv=True, output_csv=output_csv_path, show=False, save_video=True, output_video=temp_annotated_path, frame_step=2)
         total_vehicles = sum([r['count'] for r in results])
         # Prépare la vidéo annotée à renvoyer
         with open(temp_annotated_path, "rb") as f:

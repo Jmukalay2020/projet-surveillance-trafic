@@ -52,6 +52,57 @@ st.markdown('<div class="title">🚦 Surveillance du Trafic Routier à Kolwezi �
 st.markdown('<div class="subtitle">Détection automatique des embouteillages et analyse du trafic</div>', unsafe_allow_html=True)
 
 # --- Upload vidéo/image ---
+st.header('📊 Tableau de bord du trafic')
+if os.path.exists('resultats_api.csv'):
+    csv_path_abs = os.path.abspath('resultats_api.csv')
+    st.info(f"Chemin du CSV utilisé : {csv_path_abs}")
+    try:
+        with open(csv_path_abs, 'r', encoding='utf-8') as f:
+            csv_content = f.read()
+        st.code(csv_content, language='csv')
+        df_dash = pd.read_csv(csv_path_abs)
+        st.info(f"Aperçu du CSV :\n{df_dash.head().to_string(index=False)}")
+    except Exception as e:
+        st.error(f"Erreur lors de la lecture du CSV : {e}")
+        df_dash = pd.DataFrame({'count': []})
+else:
+    df_dash = pd.DataFrame({'count': []})
+with st.container():
+    dash1, dash2, dash3, dash4 = st.columns(4)
+    dash1.metric("Frames analysées", str(len(df_dash)) if not df_dash.empty else "-")
+    dash2.metric("Total véhicules", str(int(df_dash['count'].sum())) if not df_dash.empty and 'count' in df_dash.columns else "-")
+    dash3.metric("Véhicules max/frame", str(int(df_dash['count'].max())) if not df_dash.empty and 'count' in df_dash.columns else "-")
+    dash4.metric("Véhicules min/frame", str(int(df_dash['count'].min())) if not df_dash.empty and 'count' in df_dash.columns else "-")
+    st.line_chart(df_dash['count'] if not df_dash.empty and 'count' in df_dash.columns else pd.Series(dtype=int))
+    st.bar_chart(df_dash['count'].value_counts().sort_index() if not df_dash.empty and 'count' in df_dash.columns else pd.Series(dtype=int))
+    # --- Analyse congestion et conseils ---
+    if not df_dash.empty and 'count' in df_dash.columns:
+        st.markdown('---')
+        st.header('🚦 Analyse de congestion et conseils')
+        congestion_frames = 0
+        seuil_congestion = df_dash['count'].quantile(0.9)
+        fenetre = 20
+        for i in range(len(df_dash) - fenetre):
+            window = df_dash['count'].iloc[i:i+fenetre]
+            if (window.mean() > seuil_congestion) and (window.std() < 2):
+                congestion_frames += 1
+        if congestion_frames > 0:
+            st.error("⚠️ Embouteillage/congestion détecté sur plusieurs séquences de la vidéo.")
+            st.markdown("""
+            **Conseils d'amélioration du trafic :**
+            - Adapter les horaires de circulation pour éviter les pics.
+            - Mettre en place des feux intelligents ou une signalisation dynamique.
+            - Encourager le covoiturage ou les transports en commun.
+            - Optimiser la gestion des carrefours et des accès.
+            """)
+        else:
+            st.success("Trafic fluide : pas de congestion détectée sur la période analysée.")
+            st.markdown("""
+            **Conseils :**
+            - Maintenir les conditions actuelles.
+            - Continuer la surveillance pour anticiper d'éventuels problèmes.
+            """)
+    st.info("Le tableau de bord s'actualise automatiquement après chaque analyse de vidéo.")
 st.header('1️⃣ Téléversez une vidéo ou une image')
 uploaded_file = st.file_uploader('Charger une vidéo (mp4) ou une image (jpg, png)', type=['mp4', 'jpg', 'png'])
 
@@ -72,41 +123,32 @@ if uploaded_file:
                 if response.status_code == 200:
                     data = response.json()
                     st.success(f"✅ Analyse terminée. Nombre total de véhicules détectés : {data['total_vehicles']}")
+                    # Attendre que le CSV soit bien écrit sur le disque avant de recharger
+                    import time
+                    csv_path = 'resultats_api.csv'
+                    max_wait = 5
+                    waited = 0
+                    while not os.path.exists(csv_path) and waited < max_wait:
+                        time.sleep(0.5)
+                        waited += 0.5
                     # Affichage de la vidéo annotée si disponible
                     if 'annotated_video' in data:
-                        import tempfile, base64
+                        import tempfile
                         video_bytes = bytes.fromhex(data['annotated_video'])
                         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_vid:
                             tmp_vid.write(video_bytes)
                             tmp_vid_path = tmp_vid.name
                         st.video(tmp_vid_path)
-                    if 'csv_file' in data and os.path.exists('resultats_api.csv'):
-                        df = pd.read_csv('resultats_api.csv')
-                        st.markdown('<div class="result-box">', unsafe_allow_html=True)
-                        col1, col2 = st.columns(2)
-                        col1.metric("Nombre de frames analysées", len(df))
-                        col2.metric("Total véhicules détectés", int(df['count'].sum()))
-                        st.line_chart(df['count'], use_container_width=True)
-                        st.download_button(
-                            label="📥 Télécharger les résultats (CSV)",
-                            data=open('resultats_api.csv', 'rb'),
-                            file_name='resultats_api.csv',
-                            mime='text/csv',
-                            use_container_width=True
-                        )
-                        # --- Dashboard analytique ---
-                        st.markdown('---')
-                        st.header('📊 Dashboard analytique')
-                        st.subheader('Distribution des véhicules détectés')
-                        st.bar_chart(df['count'].value_counts().sort_index(), use_container_width=True)
-                        st.subheader('Statistiques')
-                        st.write(f"Moyenne véhicules/frame : {df['count'].mean():.2f}")
-                        st.write(f"Maximum véhicules sur une frame : {df['count'].max()}")
-                        st.write(f"Minimum véhicules sur une frame : {df['count'].min()}")
-                        st.write(f"Nombre de frames sans véhicule : {(df['count']==0).sum()}")
-                        st.subheader('Histogramme du trafic')
-                        st.pyplot(df['count'].plot(kind='hist', bins=20, color='#0072C6', edgecolor='black', alpha=0.7, title='Histogramme du nombre de véhicules par frame').get_figure())
-                        st.markdown('</div>', unsafe_allow_html=True)
+                        with open(tmp_vid_path, 'rb') as f:
+                            st.download_button(
+                                label="📥 Télécharger la vidéo annotée",
+                                data=f,
+                                file_name='video_annotee.mp4',
+                                mime='video/mp4',
+                                use_container_width=True
+                            )
+                    # Forcer le rechargement du dashboard après analyse
+                    st.experimental_rerun()
                 else:
                     st.error(f"Erreur API : {response.status_code} - {response.text}")
             except Exception as e:

@@ -19,7 +19,7 @@ class VehicleDetector:
         self.model = YOLO(model_path)  # Chargement du modèle YOLO
         self.conf = conf  # Seuil de confiance
 
-    def detect_vehicles(self, video_path, save_csv=False, output_csv='results.csv', show=True, save_video=False, output_video='annotated_output.mp4'):
+    def detect_vehicles(self, video_path, save_csv=False, output_csv='results.csv', show=True, save_video=False, output_video='annotated_output.mp4', frame_step=2):
         """
         Détecte les véhicules dans une vidéo.
         video_path : chemin de la vidéo à analyser
@@ -45,25 +45,24 @@ class VehicleDetector:
             writer = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
         logging.info(f"Début de la détection sur {video_path}")
         while cap.isOpened():
-            ret, frame = cap.read()  # Lit une frame
+            ret, frame = cap.read()
             if not ret:
-                break  # Fin de la vidéo
-            # Application du modèle YOLO sur la frame courante
-            results = self.model(frame, conf=self.conf)
-            boxes = results[0].boxes  # Récupère les boîtes englobantes détectées
-            count = len(boxes)  # Compte le nombre de véhicules détectés
-            vehicle_counts.append({'frame': frame_id, 'count': count})  # Ajoute le résultat
-            logging.debug(f"Frame {frame_id} : {count} véhicules détectés")
-            # Génère une image annotée avec les détections
-            annotated_frame = results[0].plot()
-            if save_video and writer is not None:
-                writer.write(annotated_frame)
-            if show:
-                cv2.imshow('Détection véhicules', annotated_frame)  # Affiche la frame annotée
-                # Quitte la boucle si la touche 'q' est pressée
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
-            frame_id += 1  # Passe à la frame suivante
+                break
+            # Traite une frame sur deux (accélère l'analyse)
+            if frame_id % frame_step == 0:
+                results = self.model(frame, conf=self.conf)
+                boxes = results[0].boxes
+                count = len(boxes)
+                vehicle_counts.append({'frame': frame_id, 'count': count})
+                logging.debug(f"Frame {frame_id} : {count} véhicules détectés")
+                annotated_frame = results[0].plot()
+                if save_video and writer is not None:
+                    writer.write(annotated_frame)
+                if show:
+                    cv2.imshow('Détection véhicules', annotated_frame)
+                    if cv2.waitKey(1) & 0xFF == ord('q'):
+                        break
+            frame_id += 1
         cap.release()  # Libère la vidéo
         if writer is not None:
             writer.release()
